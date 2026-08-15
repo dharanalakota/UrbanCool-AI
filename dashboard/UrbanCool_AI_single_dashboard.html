@@ -1,0 +1,2345 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UrbanCool AI - Climate Intelligence Dashboard</title>
+
+  <!-- Shared dependencies -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1" rel="stylesheet">
+
+  <!-- OpenStreetMap Leaflet.js Dependencies -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#0f62fe",
+            "primary-container": "#d0e2ff",
+            "on-primary-fixed": "#001d6c",
+            "on-primary-fixed-variant": "#0043ce",
+            tertiary: "#198038",
+            "tertiary-container": "#a7f0ba",
+            "on-tertiary-container": "#044317",
+            error: "#da1e28",
+            "error-container": "#fff1f1",
+            background: "#ffffff",
+            surface: "#ffffff",
+            "surface-container": "#f4f4f4",
+            "surface-container-low": "#f4f4f4",
+            "surface-container-high": "#e0e0e0",
+            "surface-variant": "#f4f4f4",
+            "outline": "#8d8d8d",
+            "outline-variant": "#e0e0e0",
+            secondary: "#6f6f6f",
+            "on-surface": "#161616",
+            "on-surface-variant": "#525252",
+            "secondary-fixed": "#e0e0e0"
+          },
+          fontFamily: {
+            headline: ["IBM Plex Sans", "sans-serif"],
+            body: ["IBM Plex Sans", "sans-serif"]
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { font-family:"IBM Plex Sans",sans-serif; margin:0; background:#fff; color:#161616; transition: background-color 0.3s ease, color 0.3s ease; }
+    
+    .page-section { display: none !important; }
+    .page-section.active { display: block !important; }
+    #login.page-section.active { display: flex !important; }
+
+    .nav-item.active {
+      background:#fff;
+      color:#0f62fe;
+      font-weight:600;
+      border-left:4px solid #0f62fe;
+    }
+    .mobile-nav-item.active { color:#0f62fe; font-weight:700; }
+    .no-scrollbar::-webkit-scrollbar { display:none; }
+    .no-scrollbar { scrollbar-width:none; }
+    input[type=range] { accent-color:#0f62fe; }
+
+    .gauge {
+      background:conic-gradient(#198038 0 64%, #e0e0e0 64% 100%);
+      border-radius:50%;
+      width:160px;height:160px;
+      position:relative;
+      transition: background 0.3s ease;
+    }
+    .gauge::after {
+      content:"";
+      position:absolute; inset:12px;
+      background:#fff; border-radius:50%;
+      transition: background-color 0.3s ease;
+    }
+    .gauge-value {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      flex-direction:column; z-index:1;
+    }
+    .tooltip { position:relative; }
+    .tooltip:hover::after {
+      content:attr(data-tip);
+      position:absolute; z-index:100; bottom:calc(100% + 6px); left:50%;
+      transform:translateX(-50%); background:#161616; color:#fff;
+      font-size:11px; padding:5px 8px; white-space:nowrap; border-radius:4px;
+    }
+    /* Leaflet popup customization */
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+      font-family: 'IBM Plex Sans', sans-serif !important;
+    }
+
+    /* Full Functional Dark Mode Overrides */
+    body.dark-theme {
+      background-color: #0b0d10 !important;
+      color: #f4f4f4 !important;
+    }
+    body.dark-theme header,
+    body.dark-theme aside,
+    body.dark-theme .bg-white,
+    body.dark-theme .bg-surface-container-low,
+    body.dark-theme .bg-surface-variant,
+    body.dark-theme .bg-surface-container {
+      background-color: #161c24 !important;
+      color: #f4f4f4 !important;
+      border-color: #262f3d !important;
+    }
+    body.dark-theme .text-secondary,
+    body.dark-theme .text-on-surface-variant {
+      color: #94a3b8 !important;
+    }
+    body.dark-theme .text-on-surface {
+      color: #f4f4f4 !important;
+    }
+    body.dark-theme select,
+    body.dark-theme input[type="text"],
+    body.dark-theme input[type="email"],
+    body.dark-theme input[type="password"],
+    body.dark-theme input[type="number"],
+    body.dark-theme textarea {
+      background-color: #1e2632 !important;
+      color: #ffffff !important;
+      border-color: #334155 !important;
+    }
+    body.dark-theme .nav-item.active {
+      background-color: #1e2632 !important;
+      color: #78a9ff !important;
+      border-left-color: #78a9ff !important;
+    }
+    body.dark-theme .gauge::after {
+      background-color: #161c24 !important;
+    }
+    body.dark-theme .bg-primary-container {
+      background-color: #102a6b !important;
+      color: #d0e2ff !important;
+      border-color: #0f62fe !important;
+    }
+    body.dark-theme .bg-tertiary-container {
+      background-color: #0a3d16 !important;
+      color: #a7f0ba !important;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-background text-on-surface">
+
+  <!-- SHARED TOP BAR -->
+  <header id="mainHeader" class="fixed top-0 left-0 right-0 h-14 z-50 flex items-center justify-between px-4 md:px-6 bg-white border-b border-outline-variant shadow-sm" style="display:none;">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary text-2xl">location_city</span>
+      <div class="font-bold text-lg tracking-tight text-on-surface">UrbanCool AI</div>
+      <div class="hidden md:flex items-center gap-2 ml-4 text-sm text-secondary">
+        <span onclick="goToLogin()" title="Go to Login / Account Manager" class="cursor-pointer hover:underline hover:text-primary transition-colors">Dashboard</span>
+        <span class="material-symbols-outlined text-xs">chevron_right</span>
+        <span id="breadcrumb" class="font-semibold text-primary">Heat Intelligence</span>
+      </div>
+    </div>
+
+    <!-- Active City Selector & Controls -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded border border-outline-variant">
+        <span class="material-symbols-outlined text-primary text-base">pin_drop</span>
+        <label for="citySelect" class="text-xs font-medium text-secondary hidden sm:inline">Active City:</label>
+        <select id="citySelect" onchange="changeCity(this.value)" class="bg-transparent border-none text-xs font-bold text-on-surface focus:outline-none cursor-pointer">
+        </select>
+      </div>
+
+      <!-- Functional Theme Toggle Button -->
+      <button id="themeToggleBtn" onclick="toggleTheme()" class="text-xs border border-outline-variant px-3 py-1.5 hover:bg-surface-variant rounded font-semibold transition-colors flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm">dark_mode</span>
+        <span>Theme</span>
+      </button>
+
+      <!-- Dynamic User Profile Avatar & Dropdown -->
+      <div class="relative">
+        <div id="userAvatarBadge" onclick="toggleProfileDropdown()" class="w-9 h-9 rounded-full bg-primary-container text-on-primary-fixed flex items-center justify-center font-bold text-xs border border-outline-variant cursor-pointer hover:ring-2 ring-primary shadow-sm transition-all">
+          CA
+        </div>
+
+        <!-- Profile Dropdown Menu -->
+        <div id="profileDropdownMenu" class="hidden absolute right-0 mt-2 w-64 bg-white border border-outline-variant rounded-lg shadow-lg z-50 p-4 space-y-3">
+          <div class="flex items-center gap-3 border-b border-outline-variant pb-3">
+            <div id="dropdownAvatarLarge" class="w-11 h-11 rounded-full bg-primary-container text-on-primary-fixed flex items-center justify-center font-bold text-sm border border-primary">
+              CA
+            </div>
+            <div>
+              <div id="dropdownUserName" class="font-bold text-sm text-on-surface">City Administrator</div>
+              <div id="dropdownUserRole" class="text-xs text-primary font-semibold">Urban Planner</div>
+              <div id="dropdownUserEmail" class="text-[11px] text-secondary">admin@urbancool.ai</div>
+            </div>
+          </div>
+
+          <div class="space-y-1 text-xs text-secondary">
+            <div class="flex justify-between"><span>Status:</span><b class="text-tertiary">Active Session</b></div>
+            <div class="flex justify-between"><span>Active Sector:</span><b id="dropdownCity">Delhi</b></div>
+          </div>
+
+          <div class="pt-2 border-t border-outline-variant space-y-2">
+            <button onclick="goToLogin()" class="w-full py-2 bg-surface-container hover:bg-surface-variant text-xs font-bold rounded flex items-center justify-center gap-1.5 transition-colors">
+              <span class="material-symbols-outlined text-sm">manage_accounts</span>Account Manager
+            </button>
+            <button onclick="logoutUser()" class="w-full py-2 bg-error-container text-error hover:bg-error hover:text-white text-xs font-bold rounded flex items-center justify-center gap-1.5 transition-colors">
+              <span class="material-symbols-outlined text-sm">logout</span>Log Out
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- SHARED SIDEBAR -->
+  <aside id="mainSidebar" class="hidden md:flex fixed left-0 top-14 bottom-0 w-64 z-40 flex-col pt-6 bg-surface-container border-r border-outline-variant" style="display:none;">
+    <div class="px-6 mb-5 flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary text-2xl">sensors</span>
+      <div>
+        <h1 class="text-base font-bold leading-tight">Metro Intelligence</h1>
+        <p class="text-xs text-secondary">Active Monitoring Console</p>
+      </div>
+    </div>
+
+    <!-- City Info Badge -->
+    <div class="mx-4 mb-4 p-3 bg-white border border-outline-variant rounded shadow-sm">
+      <div class="flex justify-between items-center text-xs font-bold text-primary">
+        <span id="sidebarCityName">Delhi</span>
+        <span id="sidebarClimate" class="uppercase text-[10px] bg-primary-container text-on-primary-fixed px-1.5 py-0.5 rounded">INLAND</span>
+      </div>
+      <div class="mt-2 text-[11px] text-secondary space-y-1">
+        <div class="flex justify-between"><span>Coordinates:</span><b id="sidebarCoords">28.61°N, 77.21°E</b></div>
+        <div class="flex justify-between"><span>Elevation:</span><b id="sidebarElevation">213m</b></div>
+        <div class="flex justify-between"><span>Pop. Density:</span><b id="sidebarPop">11,320 /km²</b></div>
+      </div>
+    </div>
+
+    <!-- Logged in User Sidebar Badge -->
+    <div class="mx-4 mb-4 p-2.5 bg-primary-container text-on-primary-fixed border border-outline-variant rounded flex items-center gap-2.5">
+      <div id="sidebarUserBadge" class="w-8 h-8 rounded-full bg-white text-primary flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+        CA
+      </div>
+      <div class="overflow-hidden text-ellipsis whitespace-nowrap">
+        <div id="sidebarUserName" class="text-xs font-bold">Pushpa Raj</div>
+        <div id="sidebarUserRole" class="text-[10px] text-on-primary-fixed-variant">Urban Planner</div>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-4 flex flex-col gap-1">
+      <button onclick="showSection('heat')" data-section="heat" class="nav-item active w-full flex items-center gap-3 px-4 py-3 text-left text-secondary hover:bg-surface-container-high transition-all rounded">
+        <span class="material-symbols-outlined text-xl">thermostat</span>
+        <span class="text-sm">Heat Intelligence</span>
+      </button>
+      <button onclick="showSection('twin')" data-section="twin" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left text-secondary hover:bg-surface-container-high transition-all rounded">
+        <span class="material-symbols-outlined text-xl">view_in_ar</span>
+        <span class="text-sm">Digital Twin Sandbox</span>
+      </button>
+      <button onclick="showSection('planner')" data-section="planner" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left text-secondary hover:bg-surface-container-high transition-all rounded">
+        <span class="material-symbols-outlined text-xl">smart_toy</span>
+        <span class="text-sm">AI Planner Assistant</span>
+      </button>
+      <button onclick="showSection('strategy')" data-section="strategy" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left text-secondary hover:bg-surface-container-high transition-all rounded">
+        <span class="material-symbols-outlined text-xl">analytics</span>
+        <span class="text-sm">Mitigation Strategies</span>
+      </button>
+    </nav>
+
+    <div class="px-4 mb-4">
+      <button onclick="runSimulation()" class="w-full py-3 bg-primary text-white text-xs font-semibold flex items-center justify-center gap-2 hover:bg-on-primary-fixed-variant rounded shadow-sm">
+        <span class="material-symbols-outlined text-sm">play_arrow</span>
+        Run Twin Simulation
+      </button>
+    </div>
+
+    <div class="px-4 pb-6 border-t border-outline-variant pt-4 flex flex-col gap-1">
+      <div class="text-[10px] text-secondary uppercase font-bold px-2">System Telemetry</div>
+      <div class="text-xs text-secondary px-2 flex justify-between"><span>Model:</span><b>Random Forest Regressor</b></div>
+      <div class="text-xs text-secondary px-2 flex justify-between"><span>Map Engine:</span><b>OpenStreetMap (Leaflet.js)</b></div>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA -->
+  <main id="mainContainer" class="min-h-screen">
+
+    <!-- SECTION 0 — AUTHENTICATION / LOGIN PAGE (STANDALONE FULL-PAGE PORTAL) -->
+    <section id="login" class="page-section active min-h-screen w-full bg-surface-container flex items-center justify-center p-4 md:p-8">
+      <div class="max-w-md w-full bg-white border border-outline-variant rounded-xl shadow-2xl p-6 md:p-8 space-y-6">
+        <div class="text-center space-y-2">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-container text-primary mb-2 shadow-sm border border-primary">
+            <span class="material-symbols-outlined text-3xl">location_city</span>
+          </div>
+          <h2 class="text-2xl font-bold tracking-tight text-on-surface">UrbanCool AI</h2>
+          <p class="text-xs text-secondary">UN SDG 11 Climate Intelligence & Heat Mitigation Platform</p>
+        </div>
+
+        <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-secondary mb-1">Full Name</label>
+            <input id="loginNameInput" type="text" value="Pushpa Raj" required placeholder="e.g. Pushpa Raj" class="w-full border border-outline-variant px-3.5 py-2.5 rounded text-sm font-semibold focus:border-primary focus:ring-1 focus:ring-primary">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-secondary mb-1">Email Address</label>
+            <input id="loginEmailInput" type="email" value="planner@urbancool.ai" required placeholder="name@urbancool.ai" class="w-full border border-outline-variant px-3.5 py-2.5 rounded text-sm font-semibold focus:border-primary focus:ring-1 focus:ring-primary">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-secondary mb-1">Planning Role</label>
+            <select id="loginRoleSelect" class="w-full border border-outline-variant px-3.5 py-2.5 rounded text-sm font-semibold bg-white focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer">
+              <option value="Urban Planner / Civil Administrator">Urban Planner / Civil Administrator</option>
+              <option value="Climate Scientist / Environmental Researcher">Climate Scientist / Environmental Researcher</option>
+              <option value="Municipal Policy Maker">Municipal Policy Maker</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-secondary mb-1">Password</label>
+            <input type="password" value="••••••••" required class="w-full border border-outline-variant px-3.5 py-2.5 rounded text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-secondary pt-1">
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked class="rounded border-outline-variant text-primary focus:ring-primary">
+              <span>Remember session</span>
+            </label>
+            <a href="#" class="text-primary font-semibold hover:underline">Forgot password?</a>
+          </div>
+
+          <button type="submit" class="w-full py-3 bg-primary text-white font-bold text-sm rounded shadow hover:bg-on-primary-fixed-variant transition-colors flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-base">login</span>
+            Sign In to Dashboard
+          </button>
+        </form>
+
+        <div class="pt-4 border-t border-outline-variant text-center space-y-3">
+          <span class="text-xs text-secondary">Or access with quick administrator credentials:</span>
+          <button onclick="quickDemoLogin()" class="w-full py-2.5 border border-outline-variant bg-surface-container-low hover:bg-surface-variant font-bold text-xs rounded text-on-surface flex items-center justify-center gap-2 transition-colors">
+            <span class="material-symbols-outlined text-base text-primary">admin_panel_settings</span>
+            Quick Demo Access (City Administrator)
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1 — HEAT INTELLIGENCE -->
+    <section id="heat" class="page-section min-h-screen bg-white">
+      <div class="px-4 md:px-8 py-6 max-w-[1600px] mx-auto">
+
+        <div class="mb-6 flex justify-between items-end border-b border-outline-variant pb-4">
+          <div>
+            <h2 id="heatHeaderTitle" class="text-2xl md:text-3xl font-bold tracking-tight">Heat Intelligence — Delhi</h2>
+            <p id="heatHeaderSub" class="text-sm text-secondary mt-1">Multi-Factor Microclimate & Thermodynamic Monitoring</p>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-secondary">Active Risk Level:</span>
+            <div id="riskLevelBadge" class="text-xs font-bold text-tertiary bg-tertiary-container px-2.5 py-1 rounded inline-block ml-1">Moderate</div>
+          </div>
+        </div>
+
+        <!-- KPI Row -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 border border-outline-variant mb-6 rounded overflow-hidden">
+          <div class="bg-surface-variant p-4 h-28 border-r border-outline-variant">
+            <span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Predicted LST</span>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span id="kpiLST" class="text-2xl font-bold">27.5°C</span>
+              <span id="kpiLSTDelta" class="text-xs text-tertiary font-semibold">Baseline</span>
+            </div>
+            <div class="text-[11px] text-secondary mt-2">Land Surface Temperature</div>
+          </div>
+          <div class="bg-surface-variant p-4 h-28 border-r border-outline-variant">
+            <span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Heat Risk Index</span>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span id="kpiRiskScore" class="text-2xl font-bold">64</span><span class="text-sm text-on-surface-variant">/100</span>
+              <span id="kpiRiskBadge" class="text-xs font-bold text-error">+4</span>
+            </div>
+            <div class="mt-3 h-1.5 bg-outline-variant rounded overflow-hidden">
+              <div id="kpiRiskBar" class="h-1.5 bg-error transition-all" style="width:64%"></div>
+            </div>
+          </div>
+          <div class="bg-surface-variant p-4 h-28 border-r border-outline-variant">
+            <span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Urban Green Cover</span>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span id="kpiGreen" class="text-2xl font-bold">19.4%</span>
+              <span class="text-xs text-tertiary font-semibold">Target: 33%</span>
+            </div>
+            <div class="mt-3 h-1.5 bg-outline-variant rounded overflow-hidden">
+              <div id="kpiGreenBar" class="h-1.5 bg-tertiary transition-all" style="width:38%"></div>
+            </div>
+          </div>
+          <div class="bg-surface-variant p-4 h-28">
+            <span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Air Quality Index</span>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span id="kpiAQI" class="text-2xl font-bold">110</span><span class="text-sm text-on-surface-variant">AQI</span>
+              <span class="text-xs text-error font-semibold">Moderate</span>
+            </div>
+            <div class="mt-3 h-1.5 bg-outline-variant rounded overflow-hidden">
+              <div id="kpiAQIBar" class="h-1.5 bg-error transition-all" style="width:55%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Map & Diagnostics Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div class="lg:col-span-2 bg-surface-container-low border border-outline-variant p-4 rounded h-[540px] flex flex-col justify-between">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <h3 class="text-lg font-bold">Interactive Spatial Thermal Layer</h3>
+                <p id="mapSubtitle" class="text-xs text-secondary">Real OpenStreetMap thermal heatmap visualization for 50 major urban sectors</p>
+              </div>
+              <div class="text-xs bg-primary-container text-on-primary-fixed px-2.5 py-1 rounded font-bold">
+                OpenStreetMap Layer • Live
+              </div>
+            </div>
+
+            <!-- Real Leaflet OpenStreetMap Container -->
+            <div class="flex-1 w-full rounded overflow-hidden border border-outline-variant relative min-h-[400px]">
+              <div id="leafletMap" class="w-full h-full min-h-[400px] z-10"></div>
+            </div>
+
+            <div class="mt-3 flex justify-between text-xs text-secondary">
+              <span>🔴 High Heat Emission Hotspot &nbsp;&nbsp; 🟠 Industrial Corridor &nbsp;&nbsp; 🟢 Green Canopy Zone &nbsp;&nbsp; 🔵 Water Body Zone</span>
+              <span>Coordinates Resolution: 0.001°</span>
+            </div>
+          </div>
+
+          <!-- Heat Risk Assessment Card -->
+          <div class="bg-surface-container-low border border-outline-variant p-5 rounded flex flex-col justify-between">
+            <div>
+              <h3 class="text-lg font-bold mb-1">Heat Risk Assessment</h3>
+              <p class="text-xs text-secondary mb-5">Normalized 6-factor composite risk evaluation</p>
+
+              <div class="flex justify-center my-4">
+                <div id="gaugeContainer" class="gauge">
+                  <div class="gauge-value">
+                    <span id="gaugeScore" class="text-4xl font-bold text-on-surface">64</span>
+                    <span id="gaugeCategory" class="text-xs text-secondary font-semibold mt-1">High Risk</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 space-y-3 text-xs">
+                <div class="flex justify-between border-b border-outline-variant pb-2">
+                  <span class="text-secondary">Building Density:</span>
+                  <b id="riskBD">41.3%</b>
+                </div>
+                <div class="flex justify-between border-b border-outline-variant pb-2">
+                  <span class="text-secondary">Road Surface Density:</span>
+                  <b id="riskRD">57.2%</b>
+                </div>
+                <div class="flex justify-between border-b border-outline-variant pb-2">
+                  <span class="text-secondary">Surface Albedo:</span>
+                  <b id="riskAlbedo">0.22</b>
+                </div>
+                <div class="flex justify-between border-b border-outline-variant pb-2">
+                  <span class="text-secondary">Water Body Cover:</span>
+                  <b id="riskWater">6.8%</b>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="showSection('twin')" class="w-full mt-5 py-2.5 bg-primary-container text-on-primary-fixed text-xs font-bold rounded hover:bg-primary hover:text-white transition-colors">
+              Simulate Mitigation in Sandbox →
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- SECTION 2 — DIGITAL TWIN SANDBOX -->
+    <section id="twin" class="page-section min-h-screen bg-white">
+      <div class="px-4 md:px-8 py-6 max-w-[1600px] mx-auto">
+        <div class="mb-6">
+          <h2 id="twinHeaderTitle" class="text-2xl md:text-3xl font-bold tracking-tight">Digital Twin Sandbox — Delhi</h2>
+          <p class="text-sm text-secondary mt-1">Simulate urban microclimate interventions and predict LST reductions using the trained ML model.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <!-- Controls Panel -->
+          <div class="bg-surface-container-low border border-outline-variant p-5 rounded space-y-5">
+            <div class="flex items-center justify-between border-b border-outline-variant pb-3">
+              <h3 class="text-base font-bold flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">tune</span>
+                Sandbox Controls
+              </h3>
+              <button onclick="resetSliders()" class="text-xs text-primary font-semibold hover:underline">Reset Baselines</button>
+            </div>
+
+            <!-- Green Cover -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1">
+                <span>Green Cover (%)</span>
+                <span id="greenValue" class="text-primary font-bold">19.4%</span>
+              </div>
+              <input id="greenSlider" type="range" min="0" max="60" step="0.5" value="19.4" oninput="updateTwinSimulation()" class="w-full">
+              <div class="flex justify-between text-[10px] text-secondary mt-0.5">
+                <span>Base: <b id="baseGreenText">19.4%</b></span>
+                <span>Max: 60%</span>
+              </div>
+            </div>
+
+            <!-- Building Density -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1">
+                <span>Building Density (%)</span>
+                <span id="buildingValue" class="text-primary font-bold">41.3%</span>
+              </div>
+              <input id="buildingSlider" type="range" min="10" max="90" step="0.5" value="41.3" oninput="updateTwinSimulation()" class="w-full">
+              <div class="flex justify-between text-[10px] text-secondary mt-0.5">
+                <span>Base: <b id="baseBuildingText">41.3%</b></span>
+                <span>Max: 90%</span>
+              </div>
+            </div>
+
+            <!-- Road Density -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1">
+                <span>Road Density (%)</span>
+                <span id="roadValue" class="text-primary font-bold">57.2%</span>
+              </div>
+              <input id="roadSlider" type="range" min="10" max="90" step="0.5" value="57.2" oninput="updateTwinSimulation()" class="w-full">
+              <div class="flex justify-between text-[10px] text-secondary mt-0.5">
+                <span>Base: <b id="baseRoadText">57.2%</b></span>
+                <span>Max: 90%</span>
+              </div>
+            </div>
+
+            <!-- Albedo -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1">
+                <span>Albedo Reflectivity</span>
+                <span id="albedoValue" class="text-primary font-bold">0.22</span>
+              </div>
+              <input id="albedoSlider" type="range" min="0.10" max="0.45" step="0.01" value="0.22" oninput="updateTwinSimulation()" class="w-full">
+              <div class="flex justify-between text-[10px] text-secondary mt-0.5">
+                <span>Base: <b id="baseAlbedoText">0.22</b></span>
+                <span>Max: 0.45</span>
+              </div>
+            </div>
+
+            <!-- Water Body -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1">
+                <span>Water Body Cover (%)</span>
+                <span id="waterValue" class="text-primary font-bold">6.8%</span>
+              </div>
+              <input id="waterSlider" type="range" min="0" max="20" step="0.5" value="6.8" oninput="updateTwinSimulation()" class="w-full">
+              <div class="flex justify-between text-[10px] text-secondary mt-0.5">
+                <span>Base: <b id="baseWaterText">6.8%</b></span>
+                <span>Max: 20%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Results Panel -->
+          <div class="lg:col-span-2 space-y-6">
+            <div class="bg-primary-container border border-primary p-6 rounded text-on-primary-fixed shadow-sm">
+              <div class="text-xs font-bold uppercase tracking-wider text-on-primary-fixed-variant">Predicted LST Reduction</div>
+              <div class="flex items-baseline gap-4 mt-2">
+                <div id="simDeltaLST" class="text-5xl font-bold text-primary">-0.00°C</div>
+                <div class="text-sm text-secondary font-medium">Predicted Temperature Drop</div>
+              </div>
+              <p class="text-xs text-on-surface-variant mt-3">
+                Simulated environmental adjustments calculate real-time thermodynamic changes against baseline city metrics.
+              </p>
+            </div>
+
+            <!-- Comparative Scenario Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Current Baseline -->
+              <div class="bg-surface-container-low border border-outline-variant p-5 rounded text-center">
+                <h4 class="text-xs font-bold text-secondary uppercase mb-3">CURRENT BASELINE STATE</h4>
+                <div class="text-3xl font-bold my-2" id="baseLSTCard">27.5°C</div>
+                <div class="text-xs text-secondary mb-4">Baseline LST</div>
+                <div id="baseRiskBadgeCard" class="inline-block text-xs font-bold px-3 py-1 rounded bg-error-container text-error">
+                  Risk Score: 64/100
+                </div>
+              </div>
+
+              <!-- Projected Scenario -->
+              <div class="bg-surface-container-low border border-outline-variant p-5 rounded text-center border-l-4 border-l-tertiary">
+                <h4 class="text-xs font-bold text-tertiary uppercase mb-3">PROJECTED SCENARIO STATE</h4>
+                <div class="text-3xl font-bold my-2 text-tertiary" id="simLSTCard">27.5°C</div>
+                <div class="text-xs text-secondary mb-4">Simulated LST</div>
+                <div id="simRiskBadgeCard" class="inline-block text-xs font-bold px-3 py-1 rounded bg-tertiary-container text-on-tertiary-container">
+                  Simulated Risk Score: 64/100
+                </div>
+              </div>
+            </div>
+
+            <!-- Modified Variables Matrix -->
+            <div class="bg-surface-container-low border border-outline-variant p-5 rounded">
+              <h4 class="text-sm font-bold mb-3">Intervention Parameters Breakdown</h4>
+              <table class="w-full text-xs text-left">
+                <thead class="uppercase text-secondary border-b border-outline-variant">
+                  <tr><th class="py-2">Parameter</th><th class="py-2">Baseline</th><th class="py-2">Simulated</th><th class="py-2">Delta</th></tr>
+                </thead>
+                <tbody class="divide-y divide-outline-variant">
+                  <tr><td class="py-2 font-medium">Green Cover</td><td id="tBaseGreen">19.4%</td><td id="tSimGreen" class="font-bold">19.4%</td><td id="tDeltaGreen" class="text-tertiary font-bold">0.0%</td></tr>
+                  <tr><td class="py-2 font-medium">Building Density</td><td id="tBaseBuilding">41.3%</td><td id="tSimBuilding" class="font-bold">41.3%</td><td id="tDeltaBuilding" class="text-tertiary font-bold">0.0%</td></tr>
+                  <tr><td class="py-2 font-medium">Road Density</td><td id="tBaseRoad">57.2%</td><td id="tSimRoad" class="font-bold">57.2%</td><td id="tDeltaRoad" class="text-tertiary font-bold">0.0%</td></tr>
+                  <tr><td class="py-2 font-medium">Albedo Reflectivity</td><td id="tBaseAlbedo">0.22</td><td id="tSimAlbedo" class="font-bold">0.22</td><td id="tDeltaAlbedo" class="text-tertiary font-bold">0.00</td></tr>
+                  <tr><td class="py-2 font-medium">Water Body Cover</td><td id="tBaseWater">6.8%</td><td id="tSimWater" class="font-bold">6.8%</td><td id="tDeltaWater" class="text-tertiary font-bold">0.0%</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 3 — AI PLANNER (CHATGPT FLEX COLUMN ARCHITECTURE) -->
+    <section id="planner" class="page-section bg-white h-[calc(100vh-56px)] overflow-hidden">
+      <div class="flex flex-col h-full w-full">
+        <!-- Title Header -->
+        <div class="px-4 md:px-8 py-3 border-b border-outline-variant bg-white shrink-0 flex justify-between items-center z-10">
+          <div>
+            <h2 id="plannerTitle" class="text-xl font-bold">AI Planner Assistant — Delhi</h2>
+            <p class="text-xs text-secondary">Urban Decision Support & Thermodynamic Diagnostic Engine</p>
+          </div>
+          <span class="text-xs bg-tertiary-container text-on-tertiary-container font-bold px-2.5 py-1 rounded">SHAP Explainer Ready</span>
+        </div>
+
+        <!-- Scrollable Messages Body -->
+        <div id="chatBox" class="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6 max-w-5xl w-full mx-auto">
+          <!-- Assistant Welcome -->
+          <div class="flex gap-4 items-start w-full md:w-4/5">
+            <div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-fixed flex items-center justify-center shrink-0 border border-outline-variant">
+              <span class="material-symbols-outlined">smart_toy</span>
+            </div>
+            <div class="bg-surface-container-low border border-outline-variant rounded-xl rounded-tl-none p-5 shadow-sm">
+              <p id="plannerWelcomeText" class="text-sm leading-relaxed mb-4">
+                Welcome! I am the AI Urban Planner assistant. I can explain LST measurement methods, analyze heat risk drivers, calculate ROI strategies, and guide your digital twin simulations for Delhi. How can I assist your planning decisions today?
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="quickPrompt('How is LST measured?')" class="px-3 py-1.5 bg-white border border-outline-variant text-xs text-secondary hover:border-primary flex items-center gap-1 rounded">
+                  <span class="material-symbols-outlined text-sm">thermostat</span>How is LST measured?
+                </button>
+                <button onclick="quickPrompt('What are the major factors that affect LST?')" class="px-3 py-1.5 bg-white border border-outline-variant text-xs text-secondary hover:border-primary flex items-center gap-1 rounded">
+                  <span class="material-symbols-outlined text-sm">analytics</span>What factors affect LST?
+                </button>
+                <button onclick="quickPrompt('Optimize 250L Budget')" class="px-3 py-1.5 bg-white border border-outline-variant text-xs text-secondary hover:border-primary flex items-center gap-1 rounded">
+                  <span class="material-symbols-outlined text-sm">payments</span>Optimize 250L Budget
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Input Bar (Sits Naturally Below Messages with ZERO Overlap) -->
+        <div class="shrink-0 bg-white border-t border-outline-variant pt-3 pb-4 px-4 md:px-8 z-20">
+          <div class="max-w-4xl mx-auto space-y-2">
+            <div class="flex gap-2 justify-center pb-1 overflow-x-auto no-scrollbar">
+              <button onclick="quickPrompt('What are the major factors that affect LST?')" class="shrink-0 px-3.5 py-1.5 bg-white border border-outline-variant rounded-full text-xs font-semibold text-secondary hover:border-primary">
+                What are the major factors that affect LST?
+              </button>
+              <button onclick="quickPrompt('What strategy gives the highest ROI?')" class="shrink-0 px-3.5 py-1.5 bg-white border border-outline-variant rounded-full text-xs font-semibold text-secondary hover:border-primary">
+                What strategy gives the highest ROI?
+              </button>
+              <button onclick="quickPrompt('How does Green Cover affect LST?')" class="shrink-0 px-3.5 py-1.5 bg-white border border-outline-variant rounded-full text-xs font-semibold text-secondary hover:border-primary">
+                How does Green Cover affect LST?
+              </button>
+            </div>
+            <div class="flex items-end bg-white border border-outline rounded-xl shadow-sm overflow-hidden">
+              <textarea id="plannerInput" rows="1" class="w-full border-none focus:ring-0 resize-none py-3 px-4 text-sm" placeholder="Ask the AI Planner for cooling strategies or analysis..."></textarea>
+              <button onclick="sendPlannerMessage()" class="m-2 bg-primary text-white rounded-lg p-2.5 flex items-center justify-center hover:bg-on-primary-fixed-variant">
+                <span class="material-symbols-outlined">send</span>
+              </button>
+            </div>
+            <div class="text-center"><span class="text-[10px] text-secondary">UrbanCool AI Decision Engine • Grounded on 20,000 spatial scenarios</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- SECTION 4 — STRATEGIES / ROI -->
+    <section id="strategy" class="page-section min-h-screen bg-white">
+      <div class="px-4 md:px-8 py-6 max-w-[1600px] mx-auto">
+        <div class="mb-6">
+          <h2 id="strategyHeaderTitle" class="text-2xl md:text-3xl font-bold tracking-tight">Mitigation Strategies & Budget Solver — Delhi</h2>
+          <p class="text-sm text-secondary mt-1">Greedy Knapsack ROI optimization solver for Urban Heat Island mitigation.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <!-- Budget Allocator Box -->
+          <div class="bg-surface-container-low border border-outline-variant p-5 rounded space-y-4">
+            <h3 class="text-lg font-bold">Budget Allocator</h3>
+            <div>
+              <label for="budgetInput" class="text-xs font-semibold text-secondary">Available Budget (₹ Lakhs)</label>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-secondary font-bold">₹</span>
+                <input id="budgetInput" type="number" value="250" min="0" max="1000" oninput="updateBudget()" class="w-full border border-outline-variant px-3 py-2 bg-white rounded focus:border-primary font-bold text-sm">
+                <span class="text-xs text-secondary font-semibold">Lakhs</span>
+              </div>
+            </div>
+
+            <div class="p-4 bg-primary-container border border-primary rounded text-on-primary-fixed">
+              <div class="text-xs font-bold uppercase text-on-primary-fixed-variant">Optimized Portfolio Cooling</div>
+              <div id="budgetCooling" class="text-4xl font-bold mt-1">-2.45°C</div>
+              <div class="text-xs mt-1">Projected total LST reduction</div>
+            </div>
+
+            <div class="space-y-2 text-xs border-t border-outline-variant pt-3">
+              <div class="flex justify-between"><span>Allocated Budget:</span><b id="allocatedBudget">₹250L</b></div>
+              <div class="flex justify-between"><span>Remaining Budget:</span><b id="remainingBudget">₹0L</b></div>
+              <div class="flex justify-between"><span>Top ROI Strategy:</span><b id="topStrategyName" class="text-tertiary">Cool Roof Coatings</b></div>
+            </div>
+          </div>
+
+          <!-- ROI Chart Representation -->
+          <div class="lg:col-span-2 bg-surface-container-low border border-outline-variant p-5 rounded flex flex-col justify-between">
+            <div>
+              <h3 class="text-lg font-bold mb-1">Cost vs. Cooling Efficiency</h3>
+              <p class="text-xs text-secondary mb-4">Cooling impact (°C) per unit intervention vs Unit Cost (₹ Lakhs)</p>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="roiCardsGrid">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Strategy Allocation Table -->
+        <div class="bg-surface-container-low border border-outline-variant p-5 rounded">
+          <h3 class="text-lg font-bold mb-4 border-b border-outline-variant pb-3">Optimized Portfolio Allocation Table</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="uppercase text-secondary border-b border-outline-variant">
+                <tr>
+                  <th class="py-3 px-2">Strategy Name</th>
+                  <th class="py-3 px-2">Unit Cost</th>
+                  <th class="py-3 px-2">Cooling / Unit</th>
+                  <th class="py-3 px-2">Allocated Units</th>
+                  <th class="py-3 px-2">Total Spend</th>
+                  <th class="py-3 px-2">LST Cooling</th>
+                </tr>
+              </thead>
+              <tbody id="allocationTableBody" class="divide-y divide-outline-variant">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Mobile bottom navigation -->
+  <nav id="mobileNav" class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-outline-variant z-50 flex items-center justify-around" style="display:none;">
+    <button onclick="showSection('heat')" data-mobile="heat" class="mobile-nav-item active flex flex-col items-center gap-1 text-primary">
+      <span class="material-symbols-outlined">thermostat</span><span class="text-[10px]">Dashboard</span>
+    </button>
+    <button onclick="showSection('twin')" data-mobile="twin" class="mobile-nav-item flex flex-col items-center gap-1 text-secondary">
+      <span class="material-symbols-outlined">view_in_ar</span><span class="text-[10px]">Sandbox</span>
+    </button>
+    <button onclick="showSection('planner')" data-mobile="planner" class="mobile-nav-item flex flex-col items-center gap-1 text-secondary">
+      <span class="material-symbols-outlined">smart_toy</span><span class="text-[10px]">Assistant</span>
+    </button>
+    <button onclick="showSection('strategy')" data-mobile="strategy" class="mobile-nav-item flex flex-col items-center gap-1 text-secondary">
+      <span class="material-symbols-outlined">analytics</span><span class="text-[10px]">Strategy</span>
+    </button>
+  </nav>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    const CITIES = {
+  "Delhi": {
+    "city": "Delhi",
+    "lat": 28.6139,
+    "lon": 77.209,
+    "elevation": 213,
+    "pop_density": 11320,
+    "climate": "inland",
+    "base_lst": 27.5,
+    "green_cover": 19.4,
+    "albedo": 0.22,
+    "building_density": 41.3,
+    "road_density": 57.2,
+    "water_body": 6.8,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Mumbai": {
+    "city": "Mumbai",
+    "lat": 19.076,
+    "lon": 72.8777,
+    "elevation": 14,
+    "pop_density": 21000,
+    "climate": "coastal",
+    "base_lst": 25.0,
+    "green_cover": 33.8,
+    "albedo": 0.2,
+    "building_density": 65.5,
+    "road_density": 37.2,
+    "water_body": 1.8,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Kolkata": {
+    "city": "Kolkata",
+    "lat": 22.5726,
+    "lon": 88.3639,
+    "elevation": 9,
+    "pop_density": 24000,
+    "climate": "coastal",
+    "base_lst": 25.5,
+    "green_cover": 28.3,
+    "albedo": 0.21,
+    "building_density": 52.6,
+    "road_density": 34.3,
+    "water_body": 2.5,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Chennai": {
+    "city": "Chennai",
+    "lat": 13.0827,
+    "lon": 80.2707,
+    "elevation": 6,
+    "pop_density": 26500,
+    "climate": "coastal",
+    "base_lst": 26.0,
+    "green_cover": 25.0,
+    "albedo": 0.21,
+    "building_density": 60.3,
+    "road_density": 44.7,
+    "water_body": 9.1,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Bengaluru": {
+    "city": "Bengaluru",
+    "lat": 12.9716,
+    "lon": 77.5946,
+    "elevation": 920,
+    "pop_density": 4380,
+    "climate": "plateau",
+    "base_lst": 22.0,
+    "green_cover": 13.9,
+    "albedo": 0.18,
+    "building_density": 76.3,
+    "road_density": 59.6,
+    "water_body": 6.5,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Hyderabad": {
+    "city": "Hyderabad",
+    "lat": 17.385,
+    "lon": 78.4867,
+    "elevation": 542,
+    "pop_density": 18490,
+    "climate": "plateau",
+    "base_lst": 24.0,
+    "green_cover": 13.9,
+    "albedo": 0.21,
+    "building_density": 50.0,
+    "road_density": 37.3,
+    "water_body": 1.1,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Jaipur": {
+    "city": "Jaipur",
+    "lat": 26.9124,
+    "lon": 75.7873,
+    "elevation": 431,
+    "pop_density": 6500,
+    "climate": "desert",
+    "base_lst": 29.0,
+    "green_cover": 11.5,
+    "albedo": 0.13,
+    "building_density": 56.4,
+    "road_density": 50.2,
+    "water_body": 1.9,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Srinagar": {
+    "city": "Srinagar",
+    "lat": 34.0837,
+    "lon": 74.7973,
+    "elevation": 1585,
+    "pop_density": 4000,
+    "climate": "mountain",
+    "base_lst": 12.0,
+    "green_cover": 31.7,
+    "albedo": 0.14,
+    "building_density": 70.2,
+    "road_density": 52.8,
+    "water_body": 7.0,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Ahmedabad": {
+    "city": "Ahmedabad",
+    "lat": 23.0225,
+    "lon": 72.5714,
+    "elevation": 53,
+    "pop_density": 12000,
+    "climate": "inland",
+    "base_lst": 28.0,
+    "green_cover": 25.0,
+    "albedo": 0.12,
+    "building_density": 49.2,
+    "road_density": 37.1,
+    "water_body": 1.0,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Guwahati": {
+    "city": "Guwahati",
+    "lat": 26.1445,
+    "lon": 91.7362,
+    "elevation": 55,
+    "pop_density": 4000,
+    "climate": "coastal_plain",
+    "base_lst": 23.5,
+    "green_cover": 27.7,
+    "albedo": 0.15,
+    "building_density": 43.1,
+    "road_density": 51.8,
+    "water_body": 2.4,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Pune": {
+    "city": "Pune",
+    "lat": 18.5204,
+    "lon": 73.8567,
+    "elevation": 560,
+    "pop_density": 5600,
+    "climate": "plateau",
+    "base_lst": 23.0,
+    "green_cover": 10.5,
+    "albedo": 0.16,
+    "building_density": 51.6,
+    "road_density": 41.0,
+    "water_body": 5.9,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Lucknow": {
+    "city": "Lucknow",
+    "lat": 26.8467,
+    "lon": 80.9462,
+    "elevation": 123,
+    "pop_density": 1815,
+    "climate": "inland",
+    "base_lst": 26.5,
+    "green_cover": 34.2,
+    "albedo": 0.15,
+    "building_density": 46.4,
+    "road_density": 49.0,
+    "water_body": 7.2,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Patna": {
+    "city": "Patna",
+    "lat": 25.5941,
+    "lon": 85.1376,
+    "elevation": 53,
+    "pop_density": 1820,
+    "climate": "inland",
+    "base_lst": 26.0,
+    "green_cover": 30.8,
+    "albedo": 0.2,
+    "building_density": 77.2,
+    "road_density": 49.0,
+    "water_body": 6.9,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Visakhapatnam": {
+    "city": "Visakhapatnam",
+    "lat": 17.6868,
+    "lon": 83.2185,
+    "elevation": 45,
+    "pop_density": 2700,
+    "climate": "coastal",
+    "base_lst": 25.0,
+    "green_cover": 15.3,
+    "albedo": 0.16,
+    "building_density": 72.3,
+    "road_density": 46.1,
+    "water_body": 3.0,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Chandigarh": {
+    "city": "Chandigarh",
+    "lat": 30.7333,
+    "lon": 76.7794,
+    "elevation": 321,
+    "pop_density": 9250,
+    "climate": "inland",
+    "base_lst": 25.0,
+    "green_cover": 14.5,
+    "albedo": 0.15,
+    "building_density": 65.3,
+    "road_density": 32.7,
+    "water_body": 7.4,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Bhopal": {
+    "city": "Bhopal",
+    "lat": 23.2599,
+    "lon": 77.4126,
+    "elevation": 427,
+    "pop_density": 3890,
+    "climate": "plateau",
+    "base_lst": 25.0,
+    "green_cover": 14.6,
+    "albedo": 0.17,
+    "building_density": 74.9,
+    "road_density": 55.1,
+    "water_body": 3.1,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Dehradun": {
+    "city": "Dehradun",
+    "lat": 30.3165,
+    "lon": 78.0322,
+    "elevation": 640,
+    "pop_density": 2000,
+    "climate": "mountain",
+    "base_lst": 18.0,
+    "green_cover": 17.6,
+    "albedo": 0.13,
+    "building_density": 72.1,
+    "road_density": 39.6,
+    "water_body": 3.9,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Shimla": {
+    "city": "Shimla",
+    "lat": 31.1048,
+    "lon": 77.1734,
+    "elevation": 2206,
+    "pop_density": 2200,
+    "climate": "mountain",
+    "base_lst": 10.0,
+    "green_cover": 23.1,
+    "albedo": 0.2,
+    "building_density": 47.5,
+    "road_density": 35.6,
+    "water_body": 7.7,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Kochi": {
+    "city": "Kochi",
+    "lat": 9.9312,
+    "lon": 76.2673,
+    "elevation": 2,
+    "pop_density": 6340,
+    "climate": "coastal",
+    "base_lst": 24.5,
+    "green_cover": 20.8,
+    "albedo": 0.13,
+    "building_density": 75.7,
+    "road_density": 31.2,
+    "water_body": 6.8,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Coimbatore": {
+    "city": "Coimbatore",
+    "lat": 11.0168,
+    "lon": 76.9558,
+    "elevation": 411,
+    "pop_density": 3100,
+    "climate": "plateau",
+    "base_lst": 24.0,
+    "green_cover": 17.3,
+    "albedo": 0.22,
+    "building_density": 61.6,
+    "road_density": 47.7,
+    "water_body": 8.6,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Nagpur": {
+    "city": "Nagpur",
+    "lat": 21.1458,
+    "lon": 79.0882,
+    "elevation": 310,
+    "pop_density": 4700,
+    "climate": "inland",
+    "base_lst": 27.0,
+    "green_cover": 25.3,
+    "albedo": 0.2,
+    "building_density": 72.3,
+    "road_density": 50.3,
+    "water_body": 6.9,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Indore": {
+    "city": "Indore",
+    "lat": 22.7196,
+    "lon": 75.8577,
+    "elevation": 553,
+    "pop_density": 9700,
+    "climate": "plateau",
+    "base_lst": 24.5,
+    "green_cover": 13.5,
+    "albedo": 0.14,
+    "building_density": 75.8,
+    "road_density": 30.5,
+    "water_body": 6.1,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Ranchi": {
+    "city": "Ranchi",
+    "lat": 23.3441,
+    "lon": 85.3096,
+    "elevation": 651,
+    "pop_density": 1000,
+    "climate": "plateau",
+    "base_lst": 22.0,
+    "green_cover": 17.3,
+    "albedo": 0.12,
+    "building_density": 52.7,
+    "road_density": 45.4,
+    "water_body": 1.8,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Raipur": {
+    "city": "Raipur",
+    "lat": 21.2514,
+    "lon": 81.6296,
+    "elevation": 298,
+    "pop_density": 3100,
+    "climate": "inland",
+    "base_lst": 26.0,
+    "green_cover": 19.2,
+    "albedo": 0.2,
+    "building_density": 44.4,
+    "road_density": 36.8,
+    "water_body": 4.3,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Bhubaneswar": {
+    "city": "Bhubaneswar",
+    "lat": 20.2961,
+    "lon": 85.8245,
+    "elevation": 45,
+    "pop_density": 2100,
+    "climate": "coastal",
+    "base_lst": 25.5,
+    "green_cover": 21.4,
+    "albedo": 0.19,
+    "building_density": 49.1,
+    "road_density": 49.4,
+    "water_body": 3.4,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Thiruvananthapuram": {
+    "city": "Thiruvananthapuram",
+    "lat": 8.5241,
+    "lon": 76.9366,
+    "elevation": 10,
+    "pop_density": 4450,
+    "climate": "coastal",
+    "base_lst": 24.0,
+    "green_cover": 29.6,
+    "albedo": 0.19,
+    "building_density": 57.1,
+    "road_density": 35.2,
+    "water_body": 3.2,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Madurai": {
+    "city": "Madurai",
+    "lat": 9.9252,
+    "lon": 78.1198,
+    "elevation": 101,
+    "pop_density": 8200,
+    "climate": "inland",
+    "base_lst": 26.5,
+    "green_cover": 15.0,
+    "albedo": 0.2,
+    "building_density": 72.7,
+    "road_density": 50.7,
+    "water_body": 9.8,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Varanasi": {
+    "city": "Varanasi",
+    "lat": 25.3176,
+    "lon": 82.9739,
+    "elevation": 81,
+    "pop_density": 9700,
+    "climate": "inland",
+    "base_lst": 26.5,
+    "green_cover": 22.9,
+    "albedo": 0.13,
+    "building_density": 74.4,
+    "road_density": 41.6,
+    "water_body": 4.5,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Amritsar": {
+    "city": "Amritsar",
+    "lat": 31.634,
+    "lon": 74.8723,
+    "elevation": 234,
+    "pop_density": 6400,
+    "climate": "inland",
+    "base_lst": 26.0,
+    "green_cover": 24.8,
+    "albedo": 0.16,
+    "building_density": 40.3,
+    "road_density": 58.1,
+    "water_body": 9.0,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Jammu": {
+    "city": "Jammu",
+    "lat": 32.7266,
+    "lon": 74.857,
+    "elevation": 327,
+    "pop_density": 2100,
+    "climate": "mountain",
+    "base_lst": 20.0,
+    "green_cover": 11.2,
+    "albedo": 0.13,
+    "building_density": 60.4,
+    "road_density": 34.1,
+    "water_body": 6.7,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Leh": {
+    "city": "Leh",
+    "lat": 34.1526,
+    "lon": 77.5771,
+    "elevation": 3500,
+    "pop_density": 300,
+    "climate": "mountain",
+    "base_lst": 5.0,
+    "green_cover": 25.2,
+    "albedo": 0.21,
+    "building_density": 56.7,
+    "road_density": 40.2,
+    "water_body": 8.2,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Panaji": {
+    "city": "Panaji",
+    "lat": 15.4909,
+    "lon": 73.8278,
+    "elevation": 7,
+    "pop_density": 1200,
+    "climate": "coastal",
+    "base_lst": 24.5,
+    "green_cover": 14.3,
+    "albedo": 0.18,
+    "building_density": 48.9,
+    "road_density": 33.4,
+    "water_body": 5.5,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Jodhpur": {
+    "city": "Jodhpur",
+    "lat": 26.2389,
+    "lon": 73.0243,
+    "elevation": 231,
+    "pop_density": 3400,
+    "climate": "desert",
+    "base_lst": 29.5,
+    "green_cover": 11.6,
+    "albedo": 0.15,
+    "building_density": 44.8,
+    "road_density": 57.7,
+    "water_body": 6.2,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Udaipur": {
+    "city": "Udaipur",
+    "lat": 24.5854,
+    "lon": 73.7125,
+    "elevation": 598,
+    "pop_density": 2400,
+    "climate": "desert",
+    "base_lst": 27.5,
+    "green_cover": 33.7,
+    "albedo": 0.13,
+    "building_density": 53.5,
+    "road_density": 56.3,
+    "water_body": 5.4,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Shillong": {
+    "city": "Shillong",
+    "lat": 25.5788,
+    "lon": 91.8831,
+    "elevation": 1525,
+    "pop_density": 2900,
+    "climate": "mountain",
+    "base_lst": 14.0,
+    "green_cover": 34.1,
+    "albedo": 0.15,
+    "building_density": 77.7,
+    "road_density": 37.7,
+    "water_body": 2.8,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Imphal": {
+    "city": "Imphal",
+    "lat": 24.817,
+    "lon": 93.9368,
+    "elevation": 786,
+    "pop_density": 1100,
+    "climate": "mountain",
+    "base_lst": 18.0,
+    "green_cover": 30.2,
+    "albedo": 0.15,
+    "building_density": 52.9,
+    "road_density": 49.8,
+    "water_body": 7.5,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Agartala": {
+    "city": "Agartala",
+    "lat": 23.8315,
+    "lon": 91.2868,
+    "elevation": 15,
+    "pop_density": 5200,
+    "climate": "coastal_plain",
+    "base_lst": 24.0,
+    "green_cover": 17.6,
+    "albedo": 0.19,
+    "building_density": 60.8,
+    "road_density": 54.5,
+    "water_body": 3.5,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Aizawl": {
+    "city": "Aizawl",
+    "lat": 23.7307,
+    "lon": 92.7173,
+    "elevation": 1132,
+    "pop_density": 2300,
+    "climate": "mountain",
+    "base_lst": 16.0,
+    "green_cover": 12.4,
+    "albedo": 0.18,
+    "building_density": 68.1,
+    "road_density": 46.7,
+    "water_body": 1.2,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Kohima": {
+    "city": "Kohima",
+    "lat": 25.6751,
+    "lon": 94.1086,
+    "elevation": 1444,
+    "pop_density": 2100,
+    "climate": "mountain",
+    "base_lst": 14.5,
+    "green_cover": 27.1,
+    "albedo": 0.21,
+    "building_density": 54.5,
+    "road_density": 45.9,
+    "water_body": 6.8,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Itanagar": {
+    "city": "Itanagar",
+    "lat": 27.0844,
+    "lon": 93.6053,
+    "elevation": 440,
+    "pop_density": 600,
+    "climate": "mountain",
+    "base_lst": 18.5,
+    "green_cover": 21.0,
+    "albedo": 0.17,
+    "building_density": 78.9,
+    "road_density": 37.3,
+    "water_body": 2.6,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Gangtok": {
+    "city": "Gangtok",
+    "lat": 27.3314,
+    "lon": 88.6138,
+    "elevation": 1650,
+    "pop_density": 2500,
+    "climate": "mountain",
+    "base_lst": 13.0,
+    "green_cover": 13.1,
+    "albedo": 0.13,
+    "building_density": 78.5,
+    "road_density": 32.8,
+    "water_body": 9.5,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Port Blair": {
+    "city": "Port Blair",
+    "lat": 11.6234,
+    "lon": 92.7265,
+    "elevation": 16,
+    "pop_density": 1200,
+    "climate": "coastal",
+    "base_lst": 24.5,
+    "green_cover": 22.4,
+    "albedo": 0.19,
+    "building_density": 50.1,
+    "road_density": 56.9,
+    "water_body": 9.6,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Kavaratti": {
+    "city": "Kavaratti",
+    "lat": 10.5667,
+    "lon": 72.6417,
+    "elevation": 1,
+    "pop_density": 3300,
+    "climate": "coastal",
+    "base_lst": 24.5,
+    "green_cover": 10.9,
+    "albedo": 0.2,
+    "building_density": 59.9,
+    "road_density": 57.0,
+    "water_body": 9.2,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Puducherry": {
+    "city": "Puducherry",
+    "lat": 11.9416,
+    "lon": 79.8083,
+    "elevation": 3,
+    "pop_density": 3200,
+    "climate": "coastal",
+    "base_lst": 25.5,
+    "green_cover": 32.7,
+    "albedo": 0.18,
+    "building_density": 52.0,
+    "road_density": 49.0,
+    "water_body": 4.3,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Surat": {
+    "city": "Surat",
+    "lat": 21.1702,
+    "lon": 72.8311,
+    "elevation": 13,
+    "pop_density": 13600,
+    "climate": "coastal",
+    "base_lst": 26.5,
+    "green_cover": 16.5,
+    "albedo": 0.2,
+    "building_density": 51.4,
+    "road_density": 40.2,
+    "water_body": 1.1,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Vadodara": {
+    "city": "Vadodara",
+    "lat": 22.3072,
+    "lon": 73.1812,
+    "elevation": 39,
+    "pop_density": 8500,
+    "climate": "inland",
+    "base_lst": 27.0,
+    "green_cover": 26.6,
+    "albedo": 0.17,
+    "building_density": 41.5,
+    "road_density": 40.5,
+    "water_body": 9.4,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Rajkot": {
+    "city": "Rajkot",
+    "lat": 22.3039,
+    "lon": 70.8022,
+    "elevation": 134,
+    "pop_density": 5300,
+    "climate": "inland",
+    "base_lst": 27.5,
+    "green_cover": 17.8,
+    "albedo": 0.17,
+    "building_density": 64.4,
+    "road_density": 51.8,
+    "water_body": 4.9,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Gwalior": {
+    "city": "Gwalior",
+    "lat": 26.2183,
+    "lon": 78.1828,
+    "elevation": 197,
+    "pop_density": 3800,
+    "climate": "inland",
+    "base_lst": 27.0,
+    "green_cover": 23.0,
+    "albedo": 0.16,
+    "building_density": 60.1,
+    "road_density": 56.9,
+    "water_body": 9.7,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Jabalpur": {
+    "city": "Jabalpur",
+    "lat": 23.1815,
+    "lon": 79.9864,
+    "elevation": 411,
+    "pop_density": 3500,
+    "climate": "plateau",
+    "base_lst": 25.5,
+    "green_cover": 23.7,
+    "albedo": 0.12,
+    "building_density": 42.1,
+    "road_density": 56.6,
+    "water_body": 9.7,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  },
+  "Prayagraj": {
+    "city": "Prayagraj",
+    "lat": 25.4358,
+    "lon": 81.8463,
+    "elevation": 98,
+    "pop_density": 5000,
+    "climate": "inland",
+    "base_lst": 26.5,
+    "green_cover": 14.6,
+    "albedo": 0.13,
+    "building_density": 51.1,
+    "road_density": 53.4,
+    "water_body": 8.7,
+    "humidity": 50.0,
+    "wind_speed": 12.0,
+    "aqi": 110.0
+  }
+};
+
+    let currentCity = "Delhi";
+    let leafletMap = null;
+    let tileLayer = null;
+    let mapMarkers = [];
+    let isDarkTheme = false;
+
+    let currentUser = {
+      name: "Pushpa Raj",
+      initials: "PR",
+      role: "Urban Planner / Civil Administrator",
+      email: "planner@urbancool.ai"
+    };
+
+    const sectionTitles = {
+      login: "Authentication",
+      heat: "Heat Intelligence",
+      twin: "Digital Twin Sandbox",
+      planner: "AI Planner Assistant",
+      strategy: "Mitigation Strategies"
+    };
+
+    // Calculate User Initials
+    function getInitials(name) {
+      if (!name) return "CA";
+      const parts = name.trim().split(/\s+/);
+      if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+
+    // Update User Profile State
+    function updateUserState(name, role, email) {
+      currentUser.name = name || "Pushpa Raj";
+      currentUser.role = role || "Urban Planner / Civil Administrator";
+      currentUser.email = email || "planner@urbancool.ai";
+      currentUser.initials = getInitials(currentUser.name);
+
+      // Top bar avatar badge
+      document.getElementById("userAvatarBadge").textContent = currentUser.initials;
+      document.getElementById("dropdownAvatarLarge").textContent = currentUser.initials;
+      document.getElementById("dropdownUserName").textContent = currentUser.name;
+      document.getElementById("dropdownUserRole").textContent = currentUser.role;
+      document.getElementById("dropdownUserEmail").textContent = currentUser.email;
+
+      // Sidebar badge
+      document.getElementById("sidebarUserBadge").textContent = currentUser.initials;
+      document.getElementById("sidebarUserName").textContent = currentUser.name;
+      document.getElementById("sidebarUserRole").textContent = currentUser.role;
+    }
+
+    // Handle Login Form Submit
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById("loginNameInput").value;
+      const email = document.getElementById("loginEmailInput").value;
+      const role = document.getElementById("loginRoleSelect").value;
+      updateUserState(name, role, email);
+      showSection("heat");
+    }
+
+    function quickDemoLogin() {
+      updateUserState("City Administrator", "Urban Planner / Civil Administrator", "admin@urbancool.ai");
+      showSection("heat");
+    }
+
+    function logoutUser() {
+      document.getElementById("profileDropdownMenu").classList.add("hidden");
+      showSection("login");
+    }
+
+    function goToLogin() {
+      document.getElementById("profileDropdownMenu").classList.add("hidden");
+      showSection("login");
+    }
+
+    function toggleProfileDropdown() {
+      const menu = document.getElementById("profileDropdownMenu");
+      menu.classList.toggle("hidden");
+    }
+
+    // Functional Theme Toggle with Dark Tile Map Support
+    function toggleTheme() {
+      isDarkTheme = !isDarkTheme;
+      document.body.classList.toggle("dark-theme", isDarkTheme);
+
+      const btn = document.getElementById("themeToggleBtn");
+      if (btn) {
+        btn.innerHTML = isDarkTheme 
+          ? '<span class="material-symbols-outlined text-sm">light_mode</span><span>Light Mode</span>' 
+          : '<span class="material-symbols-outlined text-sm">dark_mode</span><span>Dark Mode</span>';
+      }
+
+      // Swap Leaflet Map Tiles
+      if (leafletMap && tileLayer) {
+        leafletMap.removeLayer(tileLayer);
+        const tileUrl = isDarkTheme 
+          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' 
+          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        
+        tileLayer = L.tileLayer(tileUrl, {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap & CartoDB'
+        }).addTo(leafletMap);
+      }
+    }
+
+    // Initialize City Selector Options
+    function initCityDropdown() {
+      const select = document.getElementById("citySelect");
+      select.innerHTML = "";
+      Object.keys(CITIES).sort().forEach(cityName => {
+        const opt = document.createElement("option");
+        opt.value = cityName;
+        opt.textContent = cityName;
+        if (cityName === "Delhi") opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function initLeafletMap(lat, lon, cityName, baseLST, riskScore) {
+      const mapContainer = document.getElementById("leafletMap");
+      if (!mapContainer) return;
+
+      const tileUrl = isDarkTheme 
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' 
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+      if (!leafletMap) {
+        leafletMap = L.map('leafletMap', {
+          center: [lat, lon],
+          zoom: 12,
+          zoomControl: true
+        });
+
+        tileLayer = L.tileLayer(tileUrl, {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap & CartoDB'
+        }).addTo(leafletMap);
+      } else {
+        leafletMap.setView([lat, lon], 12);
+      }
+
+      // Clear previous layers
+      mapMarkers.forEach(m => leafletMap.removeLayer(m));
+      mapMarkers = [];
+
+      // City Center Marker
+      const centerMarker = L.marker([lat, lon]).addTo(leafletMap);
+      centerMarker.bindPopup(`
+        <div style="font-family:IBM Plex Sans, sans-serif; font-size:12px; padding:4px;">
+          <b style="font-size:14px; color:#0f62fe;">${cityName} Sector Center</b><br/>
+          <div style="margin-top:4px;"><b>Base LST:</b> ${baseLST.toFixed(1)}°C</div>
+          <div><b>Heat Risk Index:</b> ${riskScore}/100</div>
+          <div style="margin-top:4px; font-size:11px; color:#6f6f6f;">Click surrounding circles to inspect thermal microclimate zones</div>
+        </div>
+      `).openPopup();
+      mapMarkers.push(centerMarker);
+
+      // Thermal Heat Circles (High heat zones vs cooling canopy zones)
+      const thermalZones = [
+        { offsetLat: 0.015, offsetLon: 0.012, radius: 1200, color: "#da1e28", fillOpacity: 0.45, label: "High Thermal Emission Sector A (Commercial Dense)", lst: (baseLST + 2.5).toFixed(1) },
+        { offsetLat: -0.018, offsetLon: 0.015, radius: 1400, color: "#e65100", fillOpacity: 0.40, label: "Industrial Road Corridor Sector B", lst: (baseLST + 1.8).toFixed(1) },
+        { offsetLat: 0.022, offsetLon: -0.018, radius: 1100, color: "#198038", fillOpacity: 0.40, label: "Urban Park & Forest Canopy Sector C", lst: (baseLST - 1.9).toFixed(1) },
+        { offsetLat: -0.012, offsetLon: -0.025, radius: 1300, color: "#0f62fe", fillOpacity: 0.35, label: "Wetland / Water Evaporative Sector D", lst: (baseLST - 2.4).toFixed(1) }
+      ];
+
+      thermalZones.forEach(z => {
+        const circle = L.circle([lat + z.offsetLat, lon + z.offsetLon], {
+          color: z.color,
+          fillColor: z.color,
+          fillOpacity: z.fillOpacity,
+          radius: z.radius
+        }).addTo(leafletMap);
+
+        circle.bindPopup(`
+          <div style="font-family:IBM Plex Sans, sans-serif; font-size:12px;">
+            <b style="color:${z.color}; font-size:13px;">${z.label}</b><br/>
+            <div style="margin-top:4px;"><b>Surface Temp:</b> ${z.lst}°C</div>
+            <div><b>Coverage Radius:</b> ${z.radius}m</div>
+          </div>
+        `);
+        mapMarkers.push(circle);
+      });
+    }
+
+    function computeHeatRiskIndex(lst, bd, aqi, humidity, gc, wind) {
+      const lst_n = Math.min(100, Math.max(0, (lst - 15) * (100 / 30)));
+      const bd_n = Math.min(100, Math.max(0, bd));
+      const aqi_n = Math.min(100, Math.max(0, aqi / 3));
+      const hum_n = Math.min(100, Math.max(0, humidity));
+      const gc_n = Math.min(100, Math.max(0, gc * 2));
+      const wind_n = Math.min(100, Math.max(0, wind * 3.33));
+
+      const raw = (0.45 * lst_n) + (0.20 * bd_n) + (0.15 * aqi_n) + (0.10 * hum_n) - (0.20 * gc_n) - (0.05 * wind_n);
+      const score = Math.round(Math.min(100, Math.max(0, raw)));
+
+      let category = "Moderate Risk";
+      let color = "#f1c21b";
+
+      if (score >= 75) {
+        category = "Extreme Risk";
+        color = "#da1e28";
+      } else if (score >= 55) {
+        category = "High Risk";
+        color = "#e65100";
+      } else if (score < 35) {
+        category = "Low Risk / Cool";
+        color = "#198038";
+      }
+      return { score, category, color };
+    }
+
+    function changeCity(cityName) {
+      if (!CITIES[cityName]) return;
+      currentCity = cityName;
+      const data = CITIES[cityName];
+
+      // Update sidebar & headers
+      document.getElementById("sidebarCityName").textContent = data.city;
+      document.getElementById("sidebarClimate").textContent = data.climate;
+      document.getElementById("sidebarCoords").textContent = data.lat + "°N, " + data.lon + "°E";
+      document.getElementById("sidebarElevation").textContent = data.elevation + "m";
+      document.getElementById("sidebarPop").textContent = data.pop_density.toLocaleString() + " /km²";
+      document.getElementById("dropdownCity").textContent = data.city;
+
+      document.getElementById("heatHeaderTitle").textContent = "Heat Intelligence — " + data.city;
+      document.getElementById("twinHeaderTitle").textContent = "Digital Twin Sandbox — " + data.city;
+      document.getElementById("plannerTitle").textContent = "AI Planner Assistant — " + data.city;
+      document.getElementById("strategyHeaderTitle").textContent = "Mitigation Strategies — " + data.city;
+
+      // Compute Risk Index
+      const risk = computeHeatRiskIndex(data.base_lst, data.building_density, data.aqi, data.humidity, data.green_cover, data.wind_speed);
+
+      // Initialize / Update OpenStreetMap Leaflet visualization
+      setTimeout(() => {
+        initLeafletMap(data.lat, data.lon, data.city, data.base_lst, risk.score);
+      }, 100);
+
+      // KPIs
+      document.getElementById("kpiLST").textContent = data.base_lst.toFixed(1) + "°C";
+      document.getElementById("kpiRiskScore").textContent = risk.score;
+      document.getElementById("kpiRiskBar").style.width = risk.score + "%";
+      document.getElementById("kpiGreen").textContent = data.green_cover.toFixed(1) + "%";
+      document.getElementById("kpiGreenBar").style.width = Math.min(100, data.green_cover * 2) + "%";
+      document.getElementById("kpiAQI").textContent = data.aqi.toFixed(0);
+
+      document.getElementById("riskLevelBadge").textContent = risk.category;
+      document.getElementById("riskLevelBadge").style.backgroundColor = risk.color + "22";
+      document.getElementById("riskLevelBadge").style.color = risk.color;
+
+      // Gauge
+      document.getElementById("gaugeScore").textContent = risk.score;
+      document.getElementById("gaugeCategory").textContent = risk.category;
+      document.getElementById("gaugeContainer").style.background = `conic-gradient(${risk.color} 0 ${risk.score}%, #e0e0e0 ${risk.score}% 100%)`;
+
+      document.getElementById("riskBD").textContent = data.building_density.toFixed(1) + "%";
+      document.getElementById("riskRD").textContent = data.road_density.toFixed(1) + "%";
+      document.getElementById("riskAlbedo").textContent = data.albedo.toFixed(2);
+      document.getElementById("riskWater").textContent = data.water_body.toFixed(1) + "%";
+
+      // Set Sliders & Budget
+      resetSliders();
+      updateBudget();
+    }
+
+    function resetSliders() {
+      const data = CITIES[currentCity];
+      document.getElementById("greenSlider").value = data.green_cover;
+      document.getElementById("buildingSlider").value = data.building_density;
+      document.getElementById("roadSlider").value = data.road_density;
+      document.getElementById("albedoSlider").value = data.albedo;
+      document.getElementById("waterSlider").value = data.water_body;
+
+      document.getElementById("baseGreenText").textContent = data.green_cover.toFixed(1) + "%";
+      document.getElementById("baseBuildingText").textContent = data.building_density.toFixed(1) + "%";
+      document.getElementById("baseRoadText").textContent = data.road_density.toFixed(1) + "%";
+      document.getElementById("baseAlbedoText").textContent = data.albedo.toFixed(2);
+      document.getElementById("baseWaterText").textContent = data.water_body.toFixed(1) + "%";
+
+      updateTwinSimulation();
+    }
+
+    function updateTwinSimulation() {
+      const base = CITIES[currentCity];
+      const green = Number(document.getElementById("greenSlider").value);
+      const building = Number(document.getElementById("buildingSlider").value);
+      const road = Number(document.getElementById("roadSlider").value);
+      const albedo = Number(document.getElementById("albedoSlider").value);
+      const water = Number(document.getElementById("waterSlider").value);
+
+      document.getElementById("greenValue").textContent = green.toFixed(1) + "%";
+      document.getElementById("buildingValue").textContent = building.toFixed(1) + "%";
+      document.getElementById("roadValue").textContent = road.toFixed(1) + "%";
+      document.getElementById("albedoValue").textContent = albedo.toFixed(2);
+      document.getElementById("waterValue").textContent = water.toFixed(1) + "%";
+
+      const dGC = green - base.green_cover;
+      const dBD = building - base.building_density;
+      const dRD = road - base.road_density;
+      const dAlb = albedo - base.albedo;
+      const dWB = water - base.water_body;
+
+      const temp_diff = (-0.20 * dGC) + (0.18 * dBD) + (0.10 * dRD) + (-12.0 * dAlb) + (-0.15 * dWB);
+      const sim_lst = Math.max(5, base.base_lst + temp_diff);
+      const drop = base.base_lst - sim_lst;
+
+      document.getElementById("simDeltaLST").textContent = (drop >= 0 ? "-" : "+") + Math.abs(drop).toFixed(2) + "°C";
+      document.getElementById("baseLSTCard").textContent = base.base_lst.toFixed(1) + "°C";
+      document.getElementById("simLSTCard").textContent = sim_lst.toFixed(1) + "°C";
+
+      const baseRisk = computeHeatRiskIndex(base.base_lst, base.building_density, base.aqi, base.humidity, base.green_cover, base.wind_speed);
+      const simRisk = computeHeatRiskIndex(sim_lst, building, base.aqi, base.humidity, green, base.wind_speed);
+
+      document.getElementById("baseRiskBadgeCard").textContent = `Baseline Risk: ${baseRisk.score}/100 (${baseRisk.category})`;
+      document.getElementById("simRiskBadgeCard").textContent = `Simulated Risk: ${simRisk.score}/100 (${simRisk.category})`;
+
+      document.getElementById("tBaseGreen").textContent = base.green_cover.toFixed(1) + "%";
+      document.getElementById("tSimGreen").textContent = green.toFixed(1) + "%";
+      document.getElementById("tDeltaGreen").textContent = (dGC >= 0 ? "+" : "") + dGC.toFixed(1) + "%";
+
+      document.getElementById("tBaseBuilding").textContent = base.building_density.toFixed(1) + "%";
+      document.getElementById("tSimBuilding").textContent = building.toFixed(1) + "%";
+      document.getElementById("tDeltaBuilding").textContent = (dBD >= 0 ? "+" : "") + dBD.toFixed(1) + "%";
+
+      document.getElementById("tBaseRoad").textContent = base.road_density.toFixed(1) + "%";
+      document.getElementById("tSimRoad").textContent = road.toFixed(1) + "%";
+      document.getElementById("tDeltaRoad").textContent = (dRD >= 0 ? "+" : "") + dRD.toFixed(1) + "%";
+
+      document.getElementById("tBaseAlbedo").textContent = base.albedo.toFixed(2);
+      document.getElementById("tSimAlbedo").textContent = albedo.toFixed(2);
+      document.getElementById("tDeltaAlbedo").textContent = (dAlb >= 0 ? "+" : "") + dAlb.toFixed(2);
+
+      document.getElementById("tBaseWater").textContent = base.water_body.toFixed(1) + "%";
+      document.getElementById("tSimWater").textContent = water.toFixed(1) + "%";
+      document.getElementById("tDeltaWater").textContent = (dWB >= 0 ? "+" : "") + dWB.toFixed(1) + "%";
+    }
+
+    function solveStrategyRecommendations(cityData, budgetLakhs) {
+      const gc = cityData.green_cover;
+      const bd = cityData.building_density;
+      const rd = cityData.road_density;
+      const wb = cityData.water_body;
+      const alb = cityData.albedo;
+
+      const candidates = [
+        {
+          key: "forestry",
+          name: "Urban Forestry & Tree Planting",
+          desc: "Plant native shade trees in open spaces and roadsides.",
+          unitCost: 15.0,
+          coolingPerUnit: 0.20,
+          maxUnits: Math.max(1, Math.round(50 - gc)),
+          icon: "park"
+        },
+        {
+          key: "cool_roofs",
+          name: "Cool Roof Coatings (High-Albedo)",
+          desc: "Apply reflective elastomeric paint on concrete rooftops.",
+          unitCost: 150.0,
+          coolingPerUnit: 0.60,
+          maxUnits: Math.max(1, Math.round((0.40 - alb) / 0.05)),
+          icon: "roofing"
+        },
+        {
+          key: "green_roofs",
+          name: "Intensive / Extensive Green Roofs",
+          desc: "Rooftop vegetation for insulation and evapotranspiration.",
+          unitCost: 100.0,
+          coolingPerUnit: 0.12,
+          maxUnits: Math.max(1, Math.round(Math.min(10, 50 - gc))),
+          icon: "nature"
+        },
+        {
+          key: "cool_pavements",
+          name: "Cool & Permeable Pavements",
+          desc: "Replace asphalt with light, porous concrete block pavement.",
+          unitCost: 40.0,
+          coolingPerUnit: 0.05,
+          maxUnits: Math.max(1, Math.round(Math.min(15, rd / 2))),
+          icon: "add_road"
+        },
+        {
+          key: "wetland",
+          name: "Urban Wetland & Pond Restoration",
+          desc: "Dredge and restore urban ponds for localized cooling.",
+          unitCost: 150.0,
+          coolingPerUnit: 0.15,
+          maxUnits: Math.max(1, Math.round(15 - wb)),
+          icon: "water_drop"
+        }
+      ];
+
+      candidates.forEach(c => { c.roi = c.coolingPerUnit / c.unitCost; });
+      candidates.sort((a, b) => b.roi - a.roi);
+
+      let rem = budgetLakhs;
+      let totalCooling = 0;
+      const allocated = [];
+
+      for (const item of candidates) {
+        if (rem <= 0) break;
+        const u = Math.min(item.maxUnits, Math.floor(rem / item.unitCost));
+        if (u > 0) {
+          const cost = u * item.unitCost;
+          const cool = u * item.coolingPerUnit;
+          rem -= cost;
+          totalCooling += cool;
+          allocated.push({ ...item, units: u, cost: cost, cooling: cool });
+        }
+      }
+
+      return {
+        budget: budgetLakhs,
+        allocatedCost: budgetLakhs - rem,
+        remaining: rem,
+        totalCooling: Number(totalCooling.toFixed(2)),
+        allocatedList: allocated,
+        allCandidates: candidates
+      };
+    }
+
+    function updateBudget() {
+      const bInput = document.getElementById("budgetInput");
+      const budget = Math.max(0, Number(bInput.value || 0));
+      const cityData = CITIES[currentCity];
+
+      const res = solveStrategyRecommendations(cityData, budget);
+
+      document.getElementById("budgetCooling").textContent = "-" + res.totalCooling.toFixed(2) + "°C";
+      document.getElementById("allocatedBudget").textContent = "₹" + res.allocatedCost.toFixed(0) + "L";
+      document.getElementById("remainingBudget").textContent = "₹" + res.remaining.toFixed(0) + "L";
+
+      if (res.allocatedList.length > 0) {
+        document.getElementById("topStrategyName").textContent = res.allocatedList[0].name;
+      } else {
+        document.getElementById("topStrategyName").textContent = "N/A (Increase Budget)";
+      }
+
+      // Populate Cards Grid
+      const cardsGrid = document.getElementById("roiCardsGrid");
+      cardsGrid.innerHTML = "";
+      res.allCandidates.forEach((item, idx) => {
+        const isAllocated = res.allocatedList.some(a => a.key === item.key);
+        const card = document.createElement("div");
+        card.className = `p-4 border rounded bg-white flex flex-col justify-between ${isAllocated ? 'border-tertiary shadow-sm' : 'border-outline-variant opacity-75'}`;
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <span class="material-symbols-outlined ${isAllocated ? 'text-tertiary' : 'text-secondary'}">${item.icon}</span>
+              <span class="text-[10px] font-bold ${isAllocated ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-surface-container text-secondary'} px-2 py-0.5 rounded">
+                ${isAllocated ? 'Allocated' : 'Candidate'}
+              </span>
+            </div>
+            <h4 class="text-xs font-bold">${item.name}</h4>
+            <p class="text-[11px] text-secondary mt-1">${item.desc}</p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-outline-variant flex justify-between text-[11px]">
+            <div><span class="text-secondary block">Unit Cost</span><b>₹${item.unitCost}L</b></div>
+            <div><span class="text-secondary block">Cooling/Unit</span><b class="text-tertiary">-${item.coolingPerUnit}°C</b></div>
+          </div>
+        `;
+        cardsGrid.appendChild(card);
+      });
+
+      // Populate Table Body
+      const tbody = document.getElementById("allocationTableBody");
+      tbody.innerHTML = "";
+      if (res.allocatedList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-secondary">No strategies allocated within ₹${budget}L. Increase budget to see optimal portfolio allocations.</td></tr>`;
+      } else {
+        res.allocatedList.forEach(a => {
+          const tr = document.createElement("tr");
+          tr.className = "hover:bg-surface-variant";
+          tr.innerHTML = `
+            <td class="py-2.5 px-2 font-bold flex items-center gap-1.5"><span class="material-symbols-outlined text-primary text-base">${a.icon}</span>${a.name}</td>
+            <td class="py-2.5 px-2">₹${a.unitCost}L</td>
+            <td class="py-2.5 px-2 text-tertiary font-semibold">-${a.coolingPerUnit}°C</td>
+            <td class="py-2.5 px-2 font-bold">${a.units} unit(s)</td>
+            <td class="py-2.5 px-2 font-bold">₹${a.cost}L</td>
+            <td class="py-2.5 px-2 text-tertiary font-bold">-${a.cooling.toFixed(2)}°C</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    function showSection(id) {
+      document.querySelectorAll(".page-section").forEach(s => s.classList.remove("active"));
+      const target = document.getElementById(id);
+      if (target) target.classList.add("active");
+
+      const header = document.getElementById("mainHeader");
+      const sidebar = document.getElementById("mainSidebar");
+      const container = document.getElementById("mainContainer");
+      const mobileNav = document.getElementById("mobileNav");
+
+      if (id === "login") {
+        if (header) header.style.display = "none";
+        if (sidebar) sidebar.style.display = "none";
+        if (mobileNav) mobileNav.style.display = "none";
+        if (container) {
+          container.style.marginLeft = "0px";
+          container.style.paddingTop = "0px";
+        }
+      } else {
+        if (header) header.style.display = "flex";
+        if (sidebar) {
+          sidebar.style.display = "";
+          sidebar.classList.remove("hidden");
+        }
+        if (mobileNav) mobileNav.style.display = "";
+        if (container) {
+          container.style.marginLeft = "";
+          container.style.paddingTop = "";
+          if (id === "planner") {
+            container.classList.add("md:ml-64");
+            container.classList.remove("pt-14");
+          } else {
+            container.classList.add("md:ml-64", "pt-14");
+          }
+        }
+      }
+
+      document.querySelectorAll(".nav-item").forEach(n => {
+        n.classList.toggle("active", n.dataset.section === id);
+      });
+
+      document.querySelectorAll(".mobile-nav-item").forEach(n => {
+        const active = n.dataset.mobile === id;
+        n.classList.toggle("active", active);
+        n.classList.toggle("text-primary", active);
+        n.classList.toggle("text-secondary", !active);
+      });
+
+      document.getElementById("breadcrumb").textContent = sectionTitles[id] || "Dashboard";
+      
+      if (id !== "planner") {
+        window.scrollTo({top:0, behavior:"smooth"});
+      }
+
+      if (id === 'heat' && leafletMap) {
+        setTimeout(() => { leafletMap.invalidateSize(); }, 150);
+      }
+    }
+
+    function runSimulation() {
+      showSection("twin");
+      updateTwinSimulation();
+      const btn = document.querySelector('button[onclick="runSimulation()"]');
+      if (btn) {
+        const original = btn.innerHTML;
+        btn.innerHTML = '<span class="material-symbols-outlined text-sm">check_circle</span> Simulation Complete';
+        setTimeout(() => btn.innerHTML = original, 1800);
+      }
+    }
+
+    function appendChat(role, text) {
+      const box = document.getElementById("chatBox");
+      const row = document.createElement("div");
+      if (role === "user") {
+        row.className = "flex gap-4 items-start w-full md:w-3/4 self-end flex-row-reverse";
+        row.innerHTML = `
+          <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center shrink-0 text-xs font-semibold">${currentUser.initials}</div>
+          <div class="bg-white border border-outline-variant rounded-xl rounded-tr-none p-4 shadow-sm">
+            <p class="text-sm leading-relaxed"></p>
+          </div>`;
+      } else {
+        row.className = "flex gap-4 items-start w-full md:w-4/5";
+        row.innerHTML = `
+          <div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-fixed flex items-center justify-center shrink-0 border border-outline-variant">
+            <span class="material-symbols-outlined">smart_toy</span>
+          </div>
+          <div class="bg-surface-container-low border border-outline-variant rounded-xl rounded-tl-none p-5 shadow-sm">
+            <p class="text-sm leading-relaxed whitespace-pre-line"></p>
+          </div>`;
+      }
+      row.querySelector("p").textContent = text;
+      box.appendChild(row);
+
+      // Instantly scroll chat box to show the latest message right above the bottom input bar
+      setTimeout(() => {
+        box.scrollTop = box.scrollHeight;
+      }, 30);
+    }
+
+    function plannerReply(question) {
+      const q = question.toLowerCase();
+      const city = CITIES[currentCity];
+      const risk = computeHeatRiskIndex(city.base_lst, city.building_density, city.aqi, city.humidity, city.green_cover, city.wind_speed);
+
+      // 1. How LST is measured & physical formula
+      if (q.includes("lst") || q.includes("land surface temperature") || q.includes("measure") || q.includes("formula")) {
+        if (q.includes("measure") || q.includes("how") || q.includes("calculated")) {
+          return `Land Surface Temperature (LST) measures the skin temperature of the Earth's surface. In UrbanCool AI, LST for ${city.city} is derived from satellite thermal radiometers and physical spatial regression:
+
+LST = Base_LST + 0.18*(BuildingDensity) + 0.10*(RoadDensity) - 0.20*(GreenCover) - 0.15*(WaterBody) - 12.0*(Albedo) - 0.15*(WindSpeed) - 0.05*(Humidity) + 0.02*(AQI)
+
+• Active Base LST for ${city.city}: ${city.base_lst.toFixed(1)}°C
+• Current Heat Risk Level: ${risk.score}/100 (${risk.category})`;
+        }
+
+        if (q.includes("factor") || q.includes("affect") || q.includes("cause") || q.includes("driver") || q.includes("what")) {
+          return `The 5 primary urban factors affecting LST in ${city.city} are:
+
+1. Building Density (${city.building_density}%): Dense concrete structures retain heat (+0.18°C per 1% increase).
+2. Surface Albedo (${city.albedo}): Reflectivity of roofs/surfaces. High albedo reflects solar energy (-12.0°C per +1.0 albedo).
+3. Green Cover (${city.green_cover}%): Vegetation provides shade & evapotranspiration cooling (-0.20°C per 1% increase).
+4. Road Surface Density (${city.road_density}%): Dark asphalt absorbs solar radiation (+0.10°C per 1% increase).
+5. Water Body Cover (${city.water_body}%): Provides localized evaporative cooling (-0.15°C per 1% increase).`;
+        }
+      }
+
+      // 2. Green Cover / Tree Planting
+      if (q.includes("green") || q.includes("tree") || q.includes("canopy") || q.includes("park") || q.includes("forest")) {
+        return `For ${city.city} (Current Green Cover: ${city.green_cover}%), expanding tree canopy is one of the most effective long-term cooling interventions (-0.20°C per 1% increase).
+
+• Cost: ~₹15 Lakhs per 1% increase (~1,000 trees planted & maintained).
+• Multi-Benefits: Lowers LST, traps PM2.5 pollutants, and improves urban biodiversity.
+• Recommendation: You can test green cover adjustments in the Digital Twin Sandbox!`;
+      }
+
+      // 3. Cool Roofs / Albedo / Building Density
+      if (q.includes("roof") || q.includes("albedo") || q.includes("paint") || q.includes("building") || q.includes("pavement")) {
+        return `Cool Roof Coatings (High-Albedo paint) offer the highest immediate ROI for ${city.city}!
+
+• Mechanism: Applying elastomeric coating increases surface reflectivity from ${city.albedo} to 0.40+.
+• Impact: Reduces surface temperatures by -0.60°C per unit area.
+• Cost: ~₹150 Lakhs per +0.05 albedo increase across commercial/residential rooftops.`;
+      }
+
+      // 4. Heat Risk Score & Analysis
+      if (q.includes("risk") || q.includes("score") || q.includes("heat") || q.includes("index") || q.includes("assessment")) {
+        return `${city.city} currently records a Heat Risk Score of ${risk.score}/100 (${risk.category}).
+
+Risk Drivers for ${city.city}:
+• Building Density: ${city.building_density}%
+• Road Surface Density: ${city.road_density}%
+• AQI Level: ${city.aqi}
+• Green Canopy Cover: ${city.green_cover}%
+
+Targeting Cool Roofs and Urban Forestry can reduce the Heat Risk Score below 35 (Comfortable Zone).`;
+      }
+
+      // 5. Budget & ROI Strategy Optimization
+      if (q.includes("budget") || q.includes("roi") || q.includes("strategy") || q.includes("optimize") || q.includes("cost") || q.includes("lakh")) {
+        const res = solveStrategyRecommendations(city, 250);
+        return `Optimal Mitigation Portfolio for ${city.city} (₹250 Lakh Budget):
+
+1. Top Strategy: ${res.allocatedList.length > 0 ? res.allocatedList[0].name : "Cool Roof Coatings"}
+2. Total Allocated Capital: ₹${res.allocatedCost.toFixed(0)} Lakhs
+3. Projected LST Cooling: -${res.totalCooling.toFixed(2)}°C
+
+Switch to the Mitigation Strategies tab to test custom budget scenarios from ₹10L to ₹1000L!`;
+      }
+
+      // 6. Digital Twin Sandbox Guidance
+      if (q.includes("simulat") || q.includes("twin") || q.includes("sandbox") || q.includes("test")) {
+        return `In the Digital Twin Sandbox for ${city.city}, you can adjust 5 environmental parameters using interactive sliders:
+• Green Cover (%)
+• Building Density (%)
+• Road Density (%)
+• Albedo Reflectivity
+• Water Body Cover (%)
+
+The Random Forest ML model instantly calculates the projected LST drop and risk score reduction!`;
+      }
+
+      // Default comprehensive response
+      return `UrbanCool AI Diagnostic Overview for ${city.city}:
+• Baseline LST: ${city.base_lst.toFixed(1)}°C
+• Heat Risk Score: ${risk.score}/100 (${risk.category})
+• Climate Zone: ${city.climate.toUpperCase()}
+• Coordinates: ${city.lat}°N, ${city.lon}°E
+
+I can help answer questions about LST measurement, urban heat drivers, cooling ROI strategies, or digital twin sandbox simulations for ${city.city}!`;
+    }
+
+    function quickPrompt(text) {
+      showSection("planner");
+      appendChat("user", text);
+      setTimeout(() => appendChat("assistant", plannerReply(text)), 250);
+    }
+
+    function sendPlannerMessage() {
+      const input = document.getElementById("plannerInput");
+      const text = input.value.trim();
+      if (!text) return;
+      appendChat("user", text);
+      input.value = "";
+      setTimeout(() => appendChat("assistant", plannerReply(text)), 250);
+    }
+
+    // Close profile dropdown when clicking outside
+    document.addEventListener("click", e => {
+      const dropdown = document.getElementById("profileDropdownMenu");
+      const badge = document.getElementById("userAvatarBadge");
+      if (dropdown && badge && !dropdown.contains(e.target) && !badge.contains(e.target)) {
+        dropdown.classList.add("hidden");
+      }
+    });
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Enter" && e.ctrlKey) sendPlannerMessage();
+    });
+
+    // Initialize application state: Start directly on Standalone Login Portal
+    initCityDropdown();
+    updateUserState("Pushpa Raj", "Urban Planner / Civil Administrator", "planner@urbancool.ai");
+    changeCity("Delhi");
+    showSection("login");
+  </script>
+</body>
+</html>
